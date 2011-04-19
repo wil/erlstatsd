@@ -1,17 +1,13 @@
-%%%----------------------------------------------------------------
-%%% @author  Wil Tan <wil@dready.org>
-%%%----------------------------------------------------------------
 -module(erlstatsd).
 -behaviour(gen_server).
 
 %% External APIs
--export([start_link/1, timing/2, increment/1, decrement/1]).
+-export([start_link/1, increment/3, decrement/3, timing/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
-
-
+-record(state, {socket, host, port}).
 
 %% ===================================================================
 %% API functions
@@ -25,17 +21,14 @@
 start_link(Opts) when is_list(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
+increment(Key, Magnitude, SampleRate) ->
+    gen_server:cast(?MODULE, {increment, Key, Magnitude, SampleRate}).
 
-timing(Stat, Time) ->
-    gen_server:cast(?MODULE, {timing, Stat, Time}).
+decrement(Key, Magnitude, SampleRate) ->
+    gen_server:cast(?MODULE, {decrement, Key, Magnitude, SampleRate}).
 
-increment(Stat) ->
-    gen_server:cast(?MODULE, {increment, Stat}).
-
-decrement(Stat) ->
-    gen_server:cast(?MODULE, {decrement, Stat}).
-
-
+timing(Key, Value, SampleRate) ->
+    gen_server:cast(?MODULE, {timing, Key, Value, SampleRate}).
 
 %%----------------------------------------------------------------------
 %% @spec (Opts::[Host, Port]) -> {ok, State}           |
@@ -48,11 +41,8 @@ decrement(Stat) ->
 %%----------------------------------------------------------------------
 init([Host, Port]) ->
     process_flag(trap_exit, true),
-    % create a socket
-    {ok, Sock} = gen_udp:open(0),
-    % return our state (which is just a triplet of sock-host-port)
-    {ok, {Sock, Host, Port}}.
-
+    {ok, Socket} = gen_udp:open(0),
+    {ok, #state{socket=Socket, host=Host, port=Port}}.
 
 %%-------------------------------------------------------------------------
 %% @spec (Request, From, State) -> {reply, Reply, State}          |
@@ -66,10 +56,9 @@ init([Host, Port]) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
-handle_call(Request, _From, State) ->
-    Answer = do_request(Request, State),
-    {reply, Answer, State}.
-
+handle_call(_Request, _From, State) ->
+    Reply = ok,
+    {reply, Reply, State}.
 
 %%-------------------------------------------------------------------------
 %% @spec (Msg, State) ->{noreply, State}          |
@@ -80,10 +69,20 @@ handle_call(Request, _From, State) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
-handle_cast(Request, State) ->
-    _Answer = do_request(Request, State),
+handle_cast({increment, Key, Magnitude, SampleRate}, State) ->
+    handle_cast({send, SampleRate, io_lib:format("~s:~p|c|@~f", [Key, Magnitude, SampleRate])}, State);
+handle_cast({decrement, Key, Magnitude, SampleRate}, State) ->
+    handle_cast({send, SampleRate, io_lib:format("~s:-~p|c|@~f", [Key, Magnitude, SampleRate])}, State);
+handle_cast({timing, Key, Value, SampleRate}, State) ->
+    handle_cast({send, SampleRate, io_lib:format("~s:~p|ms|@~f", [Key, Value, SampleRate])}, State);
+handle_cast({send, SampleRate, Stats}, #state{socket=Socket, host=Host, port=Port}=State) ->
+    case random:uniform() =< SampleRate of
+        true ->
+            gen_udp:send(Socket, Host, Port, Stats);
+        false ->
+            ok
+    end,
     {noreply, State}.
-
 
 %%-------------------------------------------------------------------------
 %% @spec (Msg, State) ->{noreply, State}          |
@@ -95,11 +94,8 @@ handle_cast(Request, State) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
-handle_info(Info, State) ->
-    error_logger:error_msg("erlstatsd:handle_info got strange message ~p", [Info]),
+handle_info(_Info, State) ->
     {noreply, State}.
-
-
 
 %%-------------------------------------------------------------------------
 %% @spec (Reason, State) -> any
@@ -112,7 +108,6 @@ handle_info(Info, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-
 %%-------------------------------------------------------------------------
 %% @spec (OldVsn, State, Extra) -> {ok, NewState}
 %% @doc  Convert process state when code is changed.
@@ -122,19 +117,3 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
-%%%------------------------------------------------------------------------
-%%% Internal functions
-%%%------------------------------------------------------------------------
-
-do_request({timing, Stat, Time}, {Sock, Host, Port}) ->
-    gen_udp:send(Sock, Host, Port,
-                 io_lib:format("~s:~p|ms", [Stat, Time]));
-
-do_request({increment, Stat}, {Sock, Host, Port}) ->
-    gen_udp:send(Sock, Host, Port,
-                 Stat ++ ":1|c");
-
-do_request({decrement, Stat}, {Sock, Host, Port}) ->
-    gen_udp:send(Sock, Host, Port,
-                 Stat ++ ":-1|c").
