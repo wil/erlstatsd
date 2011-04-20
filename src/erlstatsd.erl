@@ -22,13 +22,13 @@ start_link(Opts) when is_list(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
 increment(Key, Magnitude, SampleRate) ->
-    gen_server:cast(?MODULE, {increment, Key, Magnitude, SampleRate}).
+    gen_server:cast(?MODULE, {sample, {increment, Key, Magnitude, SampleRate}}).
 
 decrement(Key, Magnitude, SampleRate) ->
-    gen_server:cast(?MODULE, {decrement, Key, Magnitude, SampleRate}).
+    gen_server:cast(?MODULE, {sample, {decrement, Key, Magnitude, SampleRate}}).
 
 timing(Key, Value, SampleRate) ->
-    gen_server:cast(?MODULE, {timing, Key, Value, SampleRate}).
+    gen_server:cast(?MODULE, {sample, {timing, Key, Value, SampleRate}}).
 
 %%----------------------------------------------------------------------
 %% @spec (Opts::[Host, Port]) -> {ok, State}           |
@@ -69,19 +69,21 @@ handle_call(_Request, _From, State) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
-handle_cast({increment, Key, Magnitude, SampleRate}, State) ->
-    handle_cast({send, SampleRate, io_lib:format("~s:~p|c|@~f", [Key, Magnitude, SampleRate])}, State);
-handle_cast({decrement, Key, Magnitude, SampleRate}, State) ->
-    handle_cast({send, SampleRate, io_lib:format("~s:-~p|c|@~f", [Key, Magnitude, SampleRate])}, State);
-handle_cast({timing, Key, Value, SampleRate}, State) ->
-    handle_cast({send, SampleRate, io_lib:format("~s:~p|ms|@~f", [Key, Value, SampleRate])}, State);
-handle_cast({send, SampleRate, Stats}, #state{socket=Socket, host=Host, port=Port}=State) ->
+handle_cast({sample, {Operation, Key, Value, SampleRate}}, State) ->
     case random:uniform() =< SampleRate of
         true ->
-            gen_udp:send(Socket, Host, Port, Stats);
+            handle_cast({Operation, Key, Value, SampleRate}, State);
         false ->
-            ok
-    end,
+            {noreply, State}
+    end;
+handle_cast({increment, Key, Magnitude, SampleRate}, State) ->
+    handle_cast({send, io_lib:format("~s:~B|c|@~f", [Key, Magnitude, SampleRate])}, State);
+handle_cast({decrement, Key, Magnitude, SampleRate}, State) ->
+    handle_cast({send, io_lib:format("~s:-~B|c|@~f", [Key, Magnitude, SampleRate])}, State);
+handle_cast({timing, Key, Value, SampleRate}, State) ->
+    handle_cast({send, io_lib:format("~s:~B|ms|@~f", [Key, Value, SampleRate])}, State);
+handle_cast({send, Stats}, #state{socket=Socket, host=Host, port=Port}=State) ->
+    gen_udp:send(Socket, Host, Port, Stats),
     {noreply, State}.
 
 %%-------------------------------------------------------------------------
@@ -116,4 +118,3 @@ terminate(_Reason, _State) ->
 %%-------------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
