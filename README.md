@@ -16,9 +16,9 @@ Run it
     $ erl -pa ebin
     1> application:start(erlstatsd).
     ok
-    2> erlstatsd:increment("test.foo.bar").
+    2> erlstatsd:increment("test.foo.bar", 1, 0.05).
     ok
-    3> erlstatsd:timing("test.foo.proctime", 51). 
+    3> erlstatsd:timing("test.foo.proctime", 51, 0.5).
     ok
 
 Specify options
