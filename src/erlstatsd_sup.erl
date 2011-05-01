@@ -30,7 +30,7 @@ init([Host, Port]) ->
 %% Internal
 %% ===================================================================
 get_hostport() ->
-    Opts = application:get_all_env(),
-    {proplists:get_value(statsd_host, Opts, "localhost"),
-     proplists:get_value(statsd_port, Opts, 8125)}.
+    {ok, IP} = application:get_env(erlstatsd, ip),
+    {ok , Port} = application:get_env(erlstatsd, port),
+    {IP, Port}.
 

@@ -1,12 +1,10 @@
-{application, erlstatsd,
- [
-  {description, ""},
+{application, erlstatsd, [
+  {description, "StatsD client"},
   {vsn, "1"},
   {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {mod, { erlstatsd_app, []}},
-  {env, []}
- ]}.
+  {applications, [kernel, stdlib]},
+  {mod, {erlstatsd_app, []}},
+  {env, [
+    {ip, "localhost"},
+    {port, 8125}]}
+]}.
