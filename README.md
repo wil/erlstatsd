@@ -21,11 +21,6 @@ Run it
     3> erlstatsd:timing("test.foo.proctime", 51, 0.5).
     ok
 
-Specify options
-
-    $ erl -pa ebin -erlstatsd statsd_host '"stats.myhost.net"'
-
-
 Credits
 -------
 This README file was shamelessly ripped from Steve Ivy's [pystatsd][pystatsd] project.
