@@ -25,7 +25,10 @@ Credits
 -------
 This README file was shamelessly ripped from Steve Ivy's [pystatsd][pystatsd] project.
 
+Thanks to [Louis-Philippe Gauthier][lpgauth] for refactoring and sample rate support!
+
 
 [pystatsd]: https://github.com/sivy/py-statsd
 [graphite]: http://graphite.wikidot.com
 [statsd]: https://github.com/etsy/statsd
+[lpgauth]: https://github.com/lpgauth
