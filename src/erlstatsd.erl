@@ -70,7 +70,7 @@ handle_call(_Request, _From, State) ->
 %% @private
 %%-------------------------------------------------------------------------
 handle_cast({sample, {Operation, Key, Value, SampleRate}}, State) ->
-    case random:uniform() =< SampleRate of
+    case rand:uniform() =< SampleRate of
         true ->
             handle_cast({Operation, Key, Value, SampleRate}, State);
         false ->
